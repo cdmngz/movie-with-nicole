@@ -1,5 +1,9 @@
-export const media = new Map<number, string>();
-media
+export const movieType = {
+  MOVIE: 1,
+  SERIE: 2,
+};
+
+export const media = new Map<number, string>()
   .set(1, "netflix")
   .set(2, "HBO")
   .set(3, "hulu")

@@ -1,5 +1,6 @@
+type movieType = 1 | 2;
+
 export type responseFromApi = Array<Movie>;
-export type movieType = 1 | 2;
 
 export interface Label {
   label: string;
@@ -48,11 +49,29 @@ export interface Search {
   movieYear: number;
 }
 
-export interface MovieTree {
-  tag: string;
-  img?: string;
+export interface TreeMovies {
+  letter: string;
+  data: TreeMovie[];
+}
+
+export interface TreeMovie {
+  label?: string;
+  title: string;
+  img: string;
   id?: string;
   year?: number;
-  label?: string;
-  children: MovieTree[];
+  children?: Seasson[];
+}
+
+interface Seasson {
+  seasson: number;
+  children: Episode[];
+}
+
+interface Episode {
+  episode: number;
+  title: string;
+  label: string;
+  id: string;
+  year: number;
 }

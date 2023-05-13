@@ -4,13 +4,9 @@ import MainLayout from "./layouts/MainLayout.vue";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { set } from "./store";
 import { ref } from "vue";
-import { useQuasar } from "quasar";
 
-const $q = useQuasar();
 const auth = getAuth();
 const loading = ref(true);
-
-$q.loading.show();
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
@@ -18,11 +14,13 @@ onAuthStateChanged(auth, (user) => {
   } else {
     set.uid("");
   }
-  $q.loading.hide();
   loading.value = false;
 });
 </script>
 
 <template>
-  <MainLayout v-if="!loading"></MainLayout>
+  <div v-if="loading" class="text-center q-ma-xl q-pa-xl">
+    <q-spinner size="xl" color="secondary" />
+  </div>
+  <MainLayout v-else></MainLayout>
 </template>

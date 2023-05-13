@@ -272,16 +272,15 @@ init();
       @movieAdded="movieAdded()"
     ></add-movie>
   </q-dialog>
-  <search-movie
-    class="q-mt-xl q-mx-xl"
-    @show-add-movie="showAddMovie()"
-    @do-search="doSearch"
-  ></search-movie>
+  <search-movie class="q-mt-xl q-mx-xl" @do-search="doSearch"></search-movie>
   <div class="text-caption text-grey text-right q-mr-xl q-my-xs">
-    <p class="grey" v-show="listViews.length">
+    <p class="grey">
       <q-icon name="movie"></q-icon>
       {{ listViews.length }}
     </p>
+  </div>
+  <div class="text-center q-mb-lg full-width">
+    <q-btn icon="movie" fab-mini color="primary" @click="showAddMovie()" />
   </div>
   <div v-if="loading" class="text-center q-ma-xl q-pa-xl">
     <q-spinner size="xl" color="secondary" />
@@ -307,11 +306,11 @@ init();
             :label="new Date(item.date).toLocaleDateString()"
           >
             <q-date v-model="item.date" minimal>
-              <div class="row items-center justify-end q-gutter-sm">
+              <div class="row justify-end q-gutter-sm">
                 <q-btn
-                  label="OK"
+                  icon="check"
                   color="green"
-                  flat
+                  outline
                   @click="updateDate(item.date, item.id)"
                   v-close-popup
                 />
@@ -439,6 +438,7 @@ init();
           <q-chip
             v-for="friend of item.friends"
             :key="friend.id"
+            color="blue-1"
             removable
             @remove="removeUserFromView(item.id, friend)"
             >{{ users.find((user) => user.id === friend.id)?.nickname }}</q-chip
@@ -446,7 +446,7 @@ init();
           <q-btn-dropdown
             dropdown-icon="add_circle"
             size="sm"
-            color="grey-6"
+            color="teal-2"
             flat
             rounded
             @click="handleViewFriends(item.friends)"
@@ -454,7 +454,7 @@ init();
             <q-list>
               <q-item clickable v-close-popup v-show="!listUsersToAdd.length">
                 <q-item-section>
-                  <q-item-label class="text-grey">No more users</q-item-label>
+                  <q-item-label class="secondary">No more users</q-item-label>
                 </q-item-section>
               </q-item>
               <q-item

@@ -2,15 +2,13 @@
 import { db } from "../utils/db";
 import { addDoc, collection, doc, Timestamp } from "firebase/firestore";
 import { reactive } from "vue";
-import { Movie, User, FormAddView, MovieTree } from "../types";
+import { Movie, User, FormAddView, TreeMovies } from "../types";
 import { get } from "../store";
-import { media } from "../utils/constants";
+import { media, movieType } from "../utils/constants";
 import { getImageUrl } from "../utils";
 
 const props = defineProps<{ movies: Movie[]; users: User[] }>();
 const emit = defineEmits(["movieAdded"]);
-
-const treeMovies: MovieTree[] = [];
 
 const form = reactive<FormAddView>({
   movie: props.movies[0],
@@ -18,84 +16,107 @@ const form = reactive<FormAddView>({
   stars: 3,
   friends: [],
   desc: "",
-  media: 1,
+  media: movieType.MOVIE,
 });
 
-const prepareTreeMovies = (listMovies: Movie[]) => {
+const getFormattedTitle = (title: string): [string, number, number, string] => {
+  const fullSplit = title.split(" - ");
+  const chapter = fullSplit.pop() || "";
+  const firstPart = fullSplit.join().split(" ");
+
+  const [seasson, episode] = firstPart.pop()!.split("x");
+  const serie = firstPart.join(" ");
+
+  return [
+    serie,
+    Number(seasson.substring(1)),
+    Number(episode.substring(1)),
+    chapter,
+  ];
+};
+
+const prepareTreeMovies = (listMovies: Movie[]): TreeMovies[] => {
+  const response: TreeMovies[] = [];
+
   listMovies.forEach((movie) => {
-    if (movie.type === 1) {
-      treeMovies.push({
-        label: movie.title,
-        img: movie.img,
-        id: movie.id,
-        tag: movie.title,
-        year: movie.year,
-        children: [],
-      });
-    } else {
-      const fullSplit = movie.title.split(" - ");
-      const firstPart = fullSplit.shift();
-      const serieName = firstPart
-        ? firstPart.split(" ").slice(0, -1).join(" ")
-        : "";
-      const chapterName = fullSplit.pop();
-      const chapters = firstPart?.split(" ").pop()?.split("x");
-      const seasson = chapters?.shift()?.substring(1);
-      const episode = chapters?.pop()?.substring(1);
-      const treeMovieIndex = treeMovies.findIndex(
-        (tree) => tree.tag === serieName
+    const firstLetter = movie.title.charAt(0);
+
+    if (!response.find((x) => x.letter === firstLetter)) {
+      response.push({ letter: firstLetter, data: [] });
+    }
+
+    const letterIndex = response.findIndex((x) => x.letter === firstLetter);
+
+    if (movie.type === movieType.MOVIE) {
+      const prepareTree = { ...movie, label: movie.title };
+      response[letterIndex].data.push(prepareTree);
+    }
+
+    if (movie.type === movieType.SERIE) {
+      const [serie, seasson, episode, chapter] = getFormattedTitle(movie.title);
+      const serieIndex = response[letterIndex].data.findIndex(
+        (x) => x.title === serie
       );
-      if (treeMovieIndex > -1) {
-        const treeSeassonIndex = treeMovies[treeMovieIndex].children.findIndex(
-          (child) => child.tag === `Seasson ${seasson}`
-        );
-        if (treeSeassonIndex > -1) {
-          treeMovies[treeMovieIndex].children[treeSeassonIndex].children.push({
-            tag: `Ep. ${episode} - ${chapterName}`,
+
+      if (serieIndex > -1) {
+        const seassonIndex = response[letterIndex].data[
+          serieIndex
+        ].children!.findIndex((x) => x.seasson === seasson);
+
+        if (seassonIndex > -1) {
+          const preparedData = {
+            title: chapter,
+            episode: episode,
             id: movie.id,
             label: movie.title,
             year: movie.year,
-            children: [],
-          });
+          };
+          response[letterIndex].data[serieIndex].children![
+            seassonIndex
+          ].children.push(preparedData);
         } else {
-          treeMovies[treeMovieIndex].children.push({
-            tag: `Seasson ${seasson}`,
+          const preparedData = {
+            seasson: seasson,
             children: [
               {
-                tag: `Ep. ${episode} - ${chapterName}`,
+                title: chapter,
+                episode: episode,
                 id: movie.id,
                 label: movie.title,
                 year: movie.year,
-                children: [],
               },
             ],
-          });
+          };
+          response[letterIndex].data[serieIndex].children?.push(preparedData);
         }
       } else {
-        treeMovies.push({
-          tag: serieName,
+        const preparedData = {
+          title: serie,
           img: movie.img,
           children: [
             {
-              tag: `Seasson ${seasson}`,
+              seasson: seasson,
               children: [
                 {
-                  tag: `Ep. ${episode} - ${chapterName}`,
+                  title: chapter,
+                  episode: episode,
                   id: movie.id,
                   year: movie.year,
                   label: movie.title,
-                  children: [],
                 },
               ],
             },
           ],
-        });
+        };
+        response[letterIndex].data.push(preparedData);
       }
     }
   });
+  console.log(response);
+  return response;
 };
 
-prepareTreeMovies(props.movies);
+const treeMovies: TreeMovies[] = prepareTreeMovies(props.movies);
 
 const addMovie = async () => {
   const movieId = form.movie.id;
@@ -126,12 +147,8 @@ const handleExpandableMovie = (value: Movie) => {
 </script>
 
 <template>
-  <q-card class="q-py-md q-px-xl">
-    <q-card-section class="row items-center">
-      <q-space />
-      <q-btn icon="close" color="red" flat round dense v-close-popup />
-    </q-card-section>
-    <q-card-section class="q-gutter-md">
+  <q-card class="q-pa-lg">
+    <q-card-section class="q-gutter-lg">
       <q-select
         v-model="form.movie"
         :options="treeMovies"
@@ -139,35 +156,49 @@ const handleExpandableMovie = (value: Movie) => {
         label="Movie"
       >
         <template v-slot:option="scope">
-          <q-expansion-item
-            expand-separator
-            :hide-expand-icon="!scope.opt.children.length"
-            @click="handleExpandableMovie(scope.opt)"
-          >
+          <q-expansion-item expand-separator>
             <template v-slot:header>
-              <q-item-section avatar>
-                <q-img :src="scope.opt.img" />
-              </q-item-section>
               <q-item-section>
-                <q-item-label>{{ scope.opt.tag }}</q-item-label>
-                <q-item-label caption>{{ scope.opt.year }}</q-item-label>
+                <q-item-label class="text-center font-weight-bold">{{
+                  scope.opt.letter
+                }}</q-item-label>
               </q-item-section>
             </template>
             <q-expansion-item
-              v-for="seasson of scope.opt.children"
-              :key="seasson"
-              :header-inset-level="1"
-              :label="seasson.tag"
+              v-for="item of scope.opt.data"
+              :key="item.id"
+              :label="item.title"
+              :hide-expand-icon="!item.children"
+              v-close-popup="!item.children"
+              expand-separator
+              @click="handleExpandableMovie(item)"
             >
+              <template v-slot:header>
+                <q-item-section avatar>
+                  <q-img :src="item.img" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>{{ item.title }}</q-item-label>
+                  <q-item-label caption>{{ item.year }}</q-item-label>
+                </q-item-section>
+              </template>
               <q-expansion-item
-                v-for="episode of seasson.children"
-                :key="episode"
-                :header-inset-level="2"
-                :label="episode.tag"
-                :caption="episode.year"
-                hide-expand-icon
-                @click="handleExpandableMovie(episode)"
-              />
+                v-for="seasson of item.children"
+                :key="seasson"
+                :header-inset-level="1"
+                :label="`Seasson ${seasson.seasson}`"
+              >
+                <q-expansion-item
+                  v-for="episode of seasson.children"
+                  :key="episode"
+                  :header-inset-level="2"
+                  :label="`Ep.${episode.episode} - ${episode.title}`"
+                  :caption="episode.year"
+                  hide-expand-icon
+                  v-close-popup
+                  @click="handleExpandableMovie(episode)"
+                />
+              </q-expansion-item>
             </q-expansion-item>
           </q-expansion-item>
         </template>
@@ -232,8 +263,15 @@ const handleExpandableMovie = (value: Movie) => {
         </q-btn>
       </q-card-section>
     </q-card-section>
-    <q-card-actions align="right" class="text-positive">
-      <q-btn @click="addMovie()" outline icon="check" v-close-popup />
+    <q-card-actions align="right">
+      <q-btn class="q-mr-sm" outline icon="close" color="red" v-close-popup />
+      <q-btn
+        outline
+        icon="check"
+        color="green"
+        v-close-popup
+        @click="addMovie()"
+      />
     </q-card-actions>
   </q-card>
 </template>
